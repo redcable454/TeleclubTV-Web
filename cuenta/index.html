@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#07101d"><title>Mi cuenta | Teleclub TV</title>
+<style>
+:root{color-scheme:dark;--bg:#07101d;--panel:#101d30;--line:#263b56;--muted:#a9b8cc;--red:#ef1238;--green:#27c779}
+*{box-sizing:border-box}body{margin:0;background:radial-gradient(ellipse at 50% 0,rgba(239,18,56,.13),transparent 42%),var(--bg);color:#f6f8fc;font-family:Inter,system-ui,Arial,sans-serif;min-height:100vh}
+a{color:#ff7188}.wrap{width:min(760px,calc(100% - 30px));margin:auto}.top{padding:22px 0;border-bottom:1px solid #1e3048}.brand{font-size:22px;font-weight:950;text-decoration:none;color:#fff;letter-spacing:-1px}.brand span{color:var(--red)}
+main{padding:45px 0}.card{background:rgba(16,29,48,.96);border:1px solid var(--line);border-radius:19px;padding:clamp(20px,5vw,34px);box-shadow:0 18px 60px #0003}
+.eyebrow{font-size:11px;letter-spacing:2px;font-weight:900;color:#ff7188}.card h1{font-size:clamp(28px,6vw,39px);margin:10px 0}.muted{color:var(--muted);line-height:1.65}
+label{display:block;margin:18px 0 7px;font-weight:750;font-size:14px}input{width:100%;background:#091321;border:1px solid #344965;color:white;border-radius:10px;padding:14px;font-size:16px;outline:none}input:focus{border-color:#ef1238}
+button,.btn{display:inline-flex;align-items:center;justify-content:center;border:0;border-radius:10px;padding:13px 18px;background:var(--red);color:white;text-decoration:none;font-weight:850;cursor:pointer}
+button{width:100%;margin-top:20px;font-size:15px}.btn.secondary{background:#26384f}.error{color:#ff9aaa;background:#431b2a;border:1px solid #7e3045;padding:12px;border-radius:10px;margin-top:15px}
+.hidden{display:none!important}.accountHead{display:flex;justify-content:space-between;gap:15px;align-items:center;flex-wrap:wrap}.status{padding:7px 12px;border-radius:999px;background:#145b3b;color:#9bf0c4;font-size:13px;font-weight:850}.status.expired{background:#5b2430;color:#ffb1bd}
+.stats{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-top:24px}.stat{background:#0a1626;border:1px solid #23364f;border-radius:13px;padding:16px;min-width:0}.stat small{display:block;color:var(--muted);margin-bottom:8px}.stat strong{font-size:17px;overflow-wrap:anywhere}.actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:20px}.actions a{flex:1;text-align:center;min-width:150px}.foot{text-align:center;color:#8193aa;font-size:12px;padding:20px 0 35px}
+@media(max-width:480px){main{padding:25px 0}.stats{grid-template-columns:1fr}.actions a{width:100%}}
+</style>
+</head>
+<body>
+<header class="top"><div class="wrap"><a class="brand" href="https://redcable454.github.io/TeleclubTV-Web/">TELECLUB <span>TV</span></a></div></header>
+<main class="wrap">
+<section id="login" class="card">
+<div class="eyebrow">ÁREA DE CLIENTES</div><h1>Consulta tu servicio</h1>
+<p class="muted">Ingresa con el mismo usuario y PIN que utilizas en la aplicación Teleclub TV.</p>
+<form id="form">
+<label for="username">Usuario</label><input id="username" name="username" autocomplete="username" minlength="3" maxlength="40" required>
+<label for="pin">PIN</label><input id="pin" name="pin" type="password" inputmode="numeric" pattern="[0-9]{4,8}" minlength="4" maxlength="8" autocomplete="current-password" required>
+<button id="submit" type="submit">Consultar mi cuenta</button>
+</form><div id="error" class="error hidden" role="alert"></div>
+</section>
+<section id="account" class="card hidden" aria-live="polite">
+<div class="accountHead"><div><div class="eyebrow">MI TELECLUB TV</div><h1 id="customerName">Mi cuenta</h1></div><span id="status" class="status">Activo</span></div>
+<p class="muted">Estos son los datos registrados actualmente para tu servicio.</p>
+<div class="stats">
+<div class="stat"><small>Usuario</small><strong id="outUsername">—</strong></div>
+<div class="stat"><small>Paquete</small><strong id="outPackage">—</strong></div>
+<div class="stat"><small>Vencimiento</small><strong id="outExpiry">—</strong></div>
+<div class="stat"><small>Dispositivos en uso</small><strong id="outDevices">—</strong></div>
+<div class="stat"><small>Límite de dispositivos</small><strong id="outLimit">—</strong></div>
+<div class="stat"><small>Último acceso a la app</small><strong id="outLast">—</strong></div>
+</div>
+<div class="actions"><a class="btn" href="https://teleclubtv-panel.micanalfmradio8.workers.dev/contratar">Renovar servicio</a><a class="btn secondary" href="https://redcable454.github.io/TeleclubTV-Web/">Volver al inicio</a></div>
+<button id="logout" class="secondary" type="button">Cerrar consulta</button>
+</section>
+<div id="fatal" class="error hidden"></div>
+</main>
+<footer class="foot wrap">© <span id="year"></span> Teleclub TV · Tus datos se consultan de forma segura y no se guardan en este navegador.</footer>
+<script>
+const API="https://teleclubtv-panel.micanalfmradio8.workers.dev/api/customer/account";
+const $=id=>document.getElementById(id);
+$("year").textContent=new Date().getFullYear();
+function fmt(value){if(!value)return "Sin fecha";const d=new Date(value);return Number.isNaN(d.getTime())?value:d.toLocaleString("es-PE",{dateStyle:"medium",timeStyle:"short",timeZone:"America/Lima"})+" (Perú)";}
+$("form").addEventListener("submit",async e=>{
+ e.preventDefault();$("error").classList.add("hidden");$("submit").disabled=true;$("submit").textContent="Consultando…";
+ try{
+  const res=await fetch(API,{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({username:$("username").value.trim(),pin:$("pin").value.trim()})});
+  const data=await res.json();if(!res.ok)throw new Error(data.error||"No se pudo consultar la cuenta.");
+  $("customerName").textContent=data.name||"Mi cuenta";$("outUsername").textContent=data.username||"—";$("outPackage").textContent=data.package||"No asignado";$("outExpiry").textContent=fmt(data.expires_at);
+  $("outDevices").textContent=String(data.devices_used??0);$("outLimit").textContent=String(data.device_limit??1);$("outLast").textContent=fmt(data.last_access_at);
+  $("status").textContent=data.status||"Activo";$("status").classList.toggle("expired",data.status==="Vencido");
+  $("login").classList.add("hidden");$("account").classList.remove("hidden");$("pin").value="";
+ }catch(err){$("error").textContent=err.message||"Error de conexión. Inténtalo nuevamente.";$("error").classList.remove("hidden");}
+ finally{$("submit").disabled=false;$("submit").textContent="Consultar mi cuenta";}
+});
+$("logout").addEventListener("click",()=>{$("account").classList.add("hidden");$("login").classList.remove("hidden");$("username").value="";$("pin").value="";$("error").classList.add("hidden");});
+</script>
+</body></html>
