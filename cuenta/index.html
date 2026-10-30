@@ -40,6 +40,8 @@ button{width:100%;margin-top:20px;font-size:15px}.btn.secondary{background:#2638
 <div class="stat"><small>Límite de dispositivos</small><strong id="outLimit">—</strong></div>
 <div class="stat"><small>Último acceso a la app</small><strong id="outLast">—</strong></div>
 </div>
+<section class="stat" style="grid-column:1/-1;margin-top:16px"><h2 style="margin:0 0 12px">Historial de pagos</h2><div id="paymentsList" class="muted">Cargando historial…</div></section>
+<section class="stat" style="grid-column:1/-1;margin-top:14px"><h2 style="margin:0 0 8px">Solicitar soporte</h2><p class="muted">Envía una consulta al equipo de Teleclub TV. Tu solicitud quedará registrada para que puedan atenderte.</p><form id="supportForm"><label for="supportSubject">Asunto</label><input id="supportSubject" maxlength="100" required placeholder="Ej. Problema con mi servicio"><label for="supportMessage">Mensaje</label><textarea id="supportMessage" maxlength="2000" minlength="10" required rows="4" style="width:100%;background:#091321;border:1px solid #344965;color:white;border-radius:10px;padding:14px;font:inherit;resize:vertical" placeholder="Describe cómo podemos ayudarte…"></textarea><button id="supportSubmit" type="submit">Enviar solicitud</button></form><div id="supportFeedback" class="hidden" role="status" style="padding:12px;border-radius:10px;margin-top:12px"></div></section>
 <div class="actions"><a class="btn" href="https://teleclubtv-panel.micanalfmradio8.workers.dev/contratar">Renovar servicio</a><a class="btn secondary" href="https://redcable454.github.io/TeleclubTV-Web/">Volver al inicio</a></div>
 <button id="logout" class="secondary" type="button">Cerrar consulta</button>
 </section>
@@ -49,20 +51,30 @@ button{width:100%;margin-top:20px;font-size:15px}.btn.secondary{background:#2638
 <script>
 const API="https://teleclubtv-panel.micanalfmradio8.workers.dev/api/customer/account";
 const $=id=>document.getElementById(id);
+let sessionCredentials=null;
 $("year").textContent=new Date().getFullYear();
 function fmt(value){if(!value)return "Sin fecha";const d=new Date(value);return Number.isNaN(d.getTime())?value:d.toLocaleString("es-PE",{dateStyle:"medium",timeStyle:"short",timeZone:"America/Lima"})+" (Perú)";}
 $("form").addEventListener("submit",async e=>{
  e.preventDefault();$("error").classList.add("hidden");$("submit").disabled=true;$("submit").textContent="Consultando…";
  try{
-  const res=await fetch(API,{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({username:$("username").value.trim(),pin:$("pin").value.trim()})});
+  const res=await fetch(API,{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify(sessionCredentials={username:$("username").value.trim(),pin:$("pin").value.trim()})});
   const data=await res.json();if(!res.ok)throw new Error(data.error||"No se pudo consultar la cuenta.");
   $("customerName").textContent=data.name||"Mi cuenta";$("outUsername").textContent=data.username||"—";$("outPackage").textContent=data.package||"No asignado";$("outExpiry").textContent=fmt(data.expires_at);
   $("outDevices").textContent=String(data.devices_used??0);$("outLimit").textContent=String(data.device_limit??1);$("outLast").textContent=fmt(data.last_access_at);
-  $("status").textContent=data.status||"Activo";$("status").classList.toggle("expired",data.status==="Vencido");
+  $("status").textContent=data.status||"Activo";$("status").classList.toggle("expired",data.status==="Vencido");renderPayments(data.payments||[]);
   $("login").classList.add("hidden");$("account").classList.remove("hidden");$("pin").value="";
  }catch(err){$("error").textContent=err.message||"Error de conexión. Inténtalo nuevamente.";$("error").classList.remove("hidden");}
  finally{$("submit").disabled=false;$("submit").textContent="Consultar mi cuenta";}
 });
-$("logout").addEventListener("click",()=>{$("account").classList.add("hidden");$("login").classList.remove("hidden");$("username").value="";$("pin").value="";$("error").classList.add("hidden");});
+function renderPayments(rows){
+ const box=$("paymentsList");box.replaceChildren();
+ if(!rows.length){box.textContent="Todavía no hay pagos registrados.";return;}
+ const table=document.createElement("table");table.style.cssText="width:100%;border-collapse:collapse;font-size:13px";
+ const head=document.createElement("tr");["Fecha","Método","Importe","Estado"].forEach(v=>{const th=document.createElement("th");th.textContent=v;th.style.cssText="text-align:left;padding:8px;border-bottom:1px solid #263b56;color:#a9b8cc";head.appendChild(th)});table.appendChild(head);
+ rows.forEach(p=>{const tr=document.createElement("tr");const vals=[fmt(p.approved_at||p.paid_at||p.created_at),p.method||"—","S/ "+(Number(p.amount_cents||0)/100).toFixed(2),p.status==="approved"?"Aprobado":p.status==="rejected"?"Rechazado":p.status==="pending"?"Pendiente":(p.status||"—")];vals.forEach(v=>{const td=document.createElement("td");td.textContent=v;td.style.cssText="padding:9px 8px;border-bottom:1px solid #1e3048";tr.appendChild(td)});table.appendChild(tr)});
+ box.appendChild(table);
+}
+$("supportForm").addEventListener("submit",async e=>{e.preventDefault();if(!sessionCredentials)return;const btn=$("supportSubmit"),feedback=$("supportFeedback");btn.disabled=true;btn.textContent="Enviando…";feedback.classList.add("hidden");try{const res=await fetch(API,{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({...sessionCredentials,action:"support",subject:$("supportSubject").value.trim(),message:$("supportMessage").value.trim()})});const data=await res.json();if(!res.ok)throw new Error(data.error||"No se pudo enviar la solicitud.");feedback.textContent=data.message||"Solicitud enviada.";feedback.style.background="#123b2d";feedback.style.color="#9bf0c4";feedback.classList.remove("hidden");$("supportForm").reset();}catch(err){feedback.textContent=err.message||"Error de conexión.";feedback.style.background="#431b2a";feedback.style.color="#ffb1bd";feedback.classList.remove("hidden");}finally{btn.disabled=false;btn.textContent="Enviar solicitud";}});
+$("logout").addEventListener("click",()=>{sessionCredentials=null;$("account").classList.add("hidden");$("login").classList.remove("hidden");$("username").value="";$("pin").value="";$("error").classList.add("hidden");});
 </script>
 </body></html>
